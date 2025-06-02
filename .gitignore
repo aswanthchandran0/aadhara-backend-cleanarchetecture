@@ -1,0 +1,9 @@
+# Node modules
+node_modules/
+
+# Environment variables
+.env
+
+# Optional: TypeScript build artifacts, logs, etc.
+dist/
+*.log
