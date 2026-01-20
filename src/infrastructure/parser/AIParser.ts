@@ -35,44 +35,65 @@ Text 2 (Back):
 ${text2}`;
 
     try {
-      // Use 'command' model which is currently available
+      // Use a currently available model
       const response = await this.cohere.chat({
-        model: "command", // Changed from 'command-r-plus' to 'command'
+        model: "command-r-plus-08-2024", // Updated to available model
         message: prompt,
-        temperature: 0.1, // Slightly increased for better results
+        temperature: 0.1,
       });
 
-      // Extract response text
+      // Extract response text - using proper TypeScript approach
       let responseText = "";
       
-      // Type guard to handle different response formats
-      const responseAny = response as any;
+      // Check the response structure properly
+      console.log("Full Cohere response:", JSON.stringify(response, null, 2));
       
-      if (responseAny.text) {
-        responseText = responseAny.text;
-      } else if (responseAny.message) {
-        if (typeof responseAny.message === 'string') {
-          responseText = responseAny.message;
-        } else if (Array.isArray(responseAny.message)) {
-          for (const item of responseAny.message) {
-            if (item.type === 'text' && item.text) {
-              responseText = item.text;
-              break;
+      // Method 1: Check if response has text directly (older API format)
+      if ('text' in response && response.text) {
+        responseText = response.text;
+      } 
+      // Method 2: Check for content array in newer API format
+      else if ('message' in response) {
+        const responseAny = response as any;
+        if (responseAny.message && responseAny.message.content) {
+          const contents = responseAny.message.content;
+          if (Array.isArray(contents)) {
+            for (const content of contents) {
+              if (content.type === 'text' && content.text) {
+                responseText = content.text;
+                break;
+              }
             }
+          } else if (typeof contents === 'string') {
+            responseText = contents;
           }
         }
-      } else if (responseAny.generations && responseAny.generations.length > 0) {
-        responseText = responseAny.generations[0].text;
+      }
+      // Method 3: Fallback to checking generations for older formats
+      else if ('generations' in response) {
+        const responseAny = response as any;
+        if (Array.isArray(responseAny.generations) && responseAny.generations.length > 0) {
+          if (responseAny.generations[0].text) {
+            responseText = responseAny.generations[0].text;
+          }
+        }
       }
       
       if (!responseText) {
-        console.warn("No text in Cohere response:", response);
-        throw new Error("No text response from Cohere API");
+        console.warn("No text found in Cohere response structure. Full response:", response);
+        // Try a different approach - stringify and look for JSON
+        const responseStr = JSON.stringify(response);
+        const jsonMatch = responseStr.match(/{"name":.*"address":.*?}/s);
+        if (jsonMatch) {
+          responseText = jsonMatch[0];
+        } else {
+          throw new Error("No text response from Cohere API");
+        }
       }
       
       // Clean the response
       responseText = responseText.trim();
-      console.log("Raw Cohere response:", responseText);
+      console.log("Raw Cohere response text:", responseText);
       
       // Remove JSON code blocks if present
       let cleanText = responseText.replace(/```json\s*|\s*```|```/g, '').trim();
